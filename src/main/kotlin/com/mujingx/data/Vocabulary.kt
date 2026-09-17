@@ -81,6 +81,25 @@ data class Word(
     var bnc: Int? = 0,
     var frq: Int? = 0,
     var exchange: String = "",
+    // --- AnimeJing Japanese fields (default values keep old English JSON compatible) ---
+    /** 漢字 / 表記形 (Japanese surface form). For English words leave empty. */
+    var kanji: String = "",
+    /** 仮名読み (Japanese reading, katakana/hiragana). */
+    var kana: String = "",
+    /** Romaji transcription of kana, for the secondary line under the main term. */
+    var romaji: String = "",
+    /** 語形変化 (conjugated forms), e.g. 食べる -> [食べ][食べた][食べれば][食べろ]. Empty for English. */
+    var conjugations: MutableList<String> = mutableListOf(),
+    /** JLPT level (5..1); 0 means ungraded. */
+    var jlpt: Int = 0,
+    /** Pitch-accent pattern like [0], [1], [2], [3]. Empty if unknown. */
+    var pitchAccent: String = "",
+    /** English gloss (from JMdict sense.eng). */
+    var glossEn: String = "",
+    /** Chinese gloss (from JMdict sense.gloss translation). */
+    var glossCn: String = "",
+    /** Anime-style frequency rank from 1 (most common in anime subtitles) downward; 0 = unknown. */
+    var animeFrequency: Int = 0,
     var externalCaptions: MutableList<ExternalCaption> = mutableListOf(),
     var captions: MutableList<Caption> = mutableListOf()
 ) {
