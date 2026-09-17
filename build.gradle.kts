@@ -286,8 +286,22 @@ val downloadWhisperModels by tasks.registering {
                 println("测试用 Whisper 模型 $model 已存在，跳过下载")
             }
         }
+}
+
+// AnimeJing: download Kuromoji neologd dictionary (placeholder, see
+// ui/util/tokenizer/Neologd.kt). Disabled because kuromoji-ipadic-neologd
+// is not on Maven Central and the upstream tarball requires a multi-step
+// build pipeline that does not fit in a one-line gradle task. Re-enable
+// when the override runtime path is implemented.
+val fetchNeologdDict by tasks.registering {
+    group = "verification"
+    description = "AnimeJing: download Kuromoji neologd dictionary (placeholder)."
+
+    doLast {
+        println("AnimeJing: neologd override not yet wired (see Neologd.kt). Skipping.")
     }
 }
+
 
 // 确保测试前已构建 Rust JNI 库和下载测试模型
 tasks.named<Test>("test") {
