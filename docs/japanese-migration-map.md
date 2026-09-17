@@ -118,4 +118,51 @@
 - A1 改名之前：确认是「AnimeJing」「番境」「日本語境」还是别的中文/罗马字命名
 - B1 字段定义之前：是否要 `kanji+kana+romaji` 三栏，还是要更简洁的「漢字 / 假名」两栏
 - D1 分词接口之前：是否接受 Kuromoji IPADIC（默认自带 25MB），还是想要用 Sudachi 或 MeCab+neologd（动漫 OOV 更少但部署更重）
+
+## 7. 用户决策（2026-09-17）
+
+| 项 | 选择 | 备注 |
+|---|---|---|
+| 项目名 | **番境** | GitHub repo 仍叫 `AnimeJing`；APP_NAME、菜单、macOS app 名称用「番境」 |
+| 卡片排版 | **2 选 1 切换**：漢字 + 罗马字 **或** 假名 + 罗马字 | 快捷键 Ctrl+P 切换「漢字模式 / 假名模式」；永远不同时显示三层 |
+| 分词器 | **Sudachi 包装** | Sudachi 的 JVM 形态（worksapplications 提供官方预编译 jar + small/medium/core 词典三档，默认 small） |
+| 示范资源 | **NHK 新闻 + 青空文庫** | 公共领域 + 官方公开；零版权风险；用户首次打开看到日语新闻视频 |
+
+### 番境卡片 UI 草图
+
+```
+漢字模式（默认）
+   食べる                    ← 漢字 28sp
+   ta be ru                  ← 罗马字 12sp 灰色
+
+假名模式（Ctrl+P 切换）
+   たべる                     ← 假名 28sp
+   ta be ru                  ← 罗马字 12sp 灰色
+
+下方一行：
+   v. 吃；吃饭；生活           ← 释义
+
+右下角可选小 tag（如果有）：
+   [动1] [食べる][食べ][食べた][食べれば]…  ← 活用形
+```
+
+### Sudachi 集成计划
+
+- 依赖：`com.worksap.nlp:sudachi:0.6.2`（worksap 官方 JVM 包装；含 dictionary/、settings/）
+- 词典档：默认 `sudachi-dictionary-small`（~50MB；含基本 80 万词）；后续可换 core（~130MB）给动漫 OOV 更好覆盖
+- Actions 里跑：
+  ```yaml
+  - name: Cache Sudachi dict
+    uses: actions/cache@v4
+    with:
+      path: ~/.cache/sudachi
+      key: sudachi-dict-small-v1
+  ```
+- 首次构建由 Gradle 任务 `fetchSudachiDict` 下载到 `~/.cache/sudachi`（与 Whisper 模型同思路）
+
+### 不做什么
+
+- 不动 `com.mujingx` 包名（重命名要改 100+ import，先做产品验证再换）
+- 不内置任何商业动漫字幕（用户自备；示范用 NHK/青空文庫）
+
 - G1 示范词库之前：是否要内置动漫？还是先用 NHK 新闻示范，避免任何版权问题
