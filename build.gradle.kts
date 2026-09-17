@@ -286,6 +286,7 @@ val downloadWhisperModels by tasks.registering {
                 println("测试用 Whisper 模型 $model 已存在，跳过下载")
             }
         }
+    }
 }
 
 // AnimeJing: download Kuromoji neologd dictionary (placeholder, see
