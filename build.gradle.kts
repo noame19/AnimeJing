@@ -163,7 +163,7 @@ compose.desktop {
         )
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.AppImage)
             packageName = "番境"
             packageVersion = version.toString()
             modules("java.compiler","java.instrument","java.management","java.prefs", "java.security.jgss","jdk.security.auth","java.sql", "jdk.unsupported","java.xml.crypto","jdk.accessibility", "java.naming" )

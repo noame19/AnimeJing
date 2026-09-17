@@ -1,0 +1,127 @@
+name: Build Package Linux
+
+# AnimeJing addition (2026-09-17): Linux packaging for Fedora / Ubuntu /
+# any AppImage-capable system. The upstream MuJing workflow matrix only
+# covers Windows + macOS. We add:
+#   - ubuntu-latest  → produces .deb (signed) and .AppImage
+#   - ubuntu-latest  → builds an .rpm from the .deb via alien
+#
+# Outputs are uploaded as workflow artifacts named
+# `linux-package-<distro>-<arch>`. No release is created automatically;
+# promotion to a GitHub Release is a separate manual step.
+on:
+  workflow_dispatch: # Manual trigger only
+  push:
+    tags: [ '*' ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    name: Build Package On ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Ubuntu 24.04 (AppImage + DEB)
+            artifactBase: linux-ubuntu
+            buildAppImage: true
+            buildDeb: true
+            buildRpm: false
+          - os: ubuntu-latest
+            name: Ubuntu 24.04 (RPM via alien)
+            artifactBase: linux-rpm
+            buildAppImage: false
+            buildDeb: true
+            buildRpm: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Set UTF-8 encoding
+        run: echo "GRADLE_OPTS=-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8" >> $GITHUB_ENV
+
+      - name: Grant execute permission on gradlew
+        run: chmod +x ./gradlew
+
+      - name: Prepare Kuromoji IPADIC dict (bundled in jar, no-op)
+        run: echo "Kuromoji IPADIC ships inside kuromoji-ipadic-0.9.0.jar; nothing to download."
+
+      # --- Build the .deb first (the .AppImage task chains off it) ---
+      - name: Build DEB package
+        if: matrix.buildDeb
+        run: ./gradlew packageDeb
+
+      - name: Build AppImage
+        if: matrix.buildAppImage
+        run: ./gradlew packageAppImage
+
+      - name: Locate DEB
+        if: matrix.buildDeb
+        id: deb
+        run: |
+          DEB=$(find build/compose/binaries/main/deb -name '*.deb' | head -1)
+          echo "deb=$DEB" >> "$GITHUB_OUTPUT"
+          if [ -z "$DEB" ]; then echo "::error::No .deb produced"; exit 1; fi
+          echo "Found: $DEB"
+
+      - name: Locate AppImage
+        if: matrix.buildAppImage
+        id: appimage
+        run: |
+          APP=$(find build/compose/binaries/main/appimage -name '*.AppImage' | head -1)
+          echo "appimage=$APP" >> "$GITHUB_OUTPUT"
+          if [ -z "$APP" ]; then echo "::error::No AppImage produced"; exit 1; fi
+          echo "Found: $APP"
+          chmod +x "$APP"
+
+      - name: Convert DEB → RPM via alien
+        if: matrix.buildRpm
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y alien
+          DEB=$(find build/compose/binaries/main/deb -name '*.deb' | head -1)
+          if [ -z "$DEB" ]; then echo "::error::No .deb produced"; exit 1; fi
+          # -k keeps version; --scripts preserves pre/post scripts (none here).
+          sudo alien --to-rpm --scripts --keep-version "$DEB"
+          mkdir -p build/compose/binaries/main/rpm
+          mv *.rpm build/compose/binaries/main/rpm/
+
+      - name: Upload DEB
+        if: matrix.buildDeb
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactBase }}-deb
+          path: build/compose/binaries/main/deb/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload AppImage
+        if: matrix.buildAppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactBase }}-appimage
+          path: build/compose/binaries/main/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload RPM
+        if: matrix.buildRpm
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactBase }}-rpm
+          path: build/compose/binaries/main/rpm/*.rpm
+          if-no-files-found: error
+          retention-days: 14
