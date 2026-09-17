@@ -125,7 +125,8 @@
 |---|---|---|
 | 项目名 | **番境** | GitHub repo 仍叫 `AnimeJing`；APP_NAME、菜单、macOS app 名称用「番境」 |
 | 卡片排版 | **2 选 1 切换**：漢字 + 罗马字 **或** 假名 + 罗马字 | 快捷键 Ctrl+P 切换「漢字模式 / 假名模式」；永远不同时显示三层 |
-| 分词器 | **Sudachi 包装** | Sudachi 的 JVM 形态（worksapplications 提供官方预编译 jar + small/medium/core 词典三档，默认 small） |
+| 分词器 | **Kuromoji + 运行时下载 neologd** | 用户决策：worksap Sudachi 已 archive maven 拉不稳，改用 atilika/kuromoji-ipadic（中央仓库可用），运行时下载 mecab-ipadic-neologd 字典 ~70MB |
+
 | 示范资源 | **NHK 新闻 + 青空文庫** | 公共领域 + 官方公开；零版权风险；用户首次打开看到日语新闻视频 |
 
 ### 番境卡片 UI 草图
@@ -146,10 +147,22 @@
    [动1] [食べる][食べ][食べた][食べれば]…  ← 活用形
 ```
 
-### Sudachi 集成计划
 
-- 依赖：`com.worksap.nlp:sudachi:0.6.2`（worksap 官方 JVM 包装；含 dictionary/、settings/）
-- 词典档：默认 `sudachi-dictionary-small`（~50MB；含基本 80 万词）；后续可换 core（~130MB）给动漫 OOV 更好覆盖
+### Kuromoji + neologd 集成计划（2026-09-17 修订）
+
+- 依赖：`com.atilika.kuromoji:kuromoji-ipadic:0.9.0`（maven 中央仍在维护）
+- 默认字典：Kuromoji 自带 IPADIC ~25MB
+- 增强字典：首次启动 `fetchNeologdDict` 任务下载 mecab-ipadic-neologd `.dic` 二进制到 `~/.cache/kuromoji/neologd/`（~70MB）
+- Actions 里跑：
+  ```yaml
+  - name: Cache Kuromoji neologd dict
+    uses: actions/cache@v4
+    with:
+      path: ~/.cache/kuromoji/neologd
+      key: kuromoji-neologd-v1
+  ```
+- 词态还原：Kuromoji 的 `MorphemeList.baseForm` 已经返回原型；动词活用形收录由 `JapaneseTokenizer.expandConjugations` 在 GenerateVocabulary 里展开
+- 失败回退：如果 neologd 下载失败（无网/超时），fallback 到 IPADIC 不报错（log warn）
 - Actions 里跑：
   ```yaml
   - name: Cache Sudachi dict
