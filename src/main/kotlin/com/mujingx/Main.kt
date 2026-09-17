@@ -38,7 +38,7 @@ fun main() = application {
 }
 
 fun init(){
-    FileKit.init(appId = "幕境")
+    FileKit.init(appId = "番境")
     if(isSystemDarkMode()) {
         FlatDarkLaf.setup()
     }else {

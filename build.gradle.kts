@@ -25,7 +25,7 @@ group = "com.mujingx"
 version = "2.12.3"
 
 buildConfig {
-    buildConfigField("APP_NAME", provider { "幕境" })
+    buildConfigField("APP_NAME", provider { "番境" })
     buildConfigField("APP_VERSION", provider { "v${project.version}" })
 }
 
@@ -162,17 +162,19 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "幕境"
+            packageName = "番境"
             packageVersion = version.toString()
             modules("java.compiler","java.instrument","java.management","java.prefs", "java.security.jgss","jdk.security.auth","java.sql", "jdk.unsupported","java.xml.crypto","jdk.accessibility", "java.naming" )
             appResourcesRootDir.set(project.layout.projectDirectory.dir("resources"))
-            copyright = "Copyright 2023 Shimin Tang. All rights reserved."
-            vendor = "深圳市龙华区幕境网络工作室"
+            copyright = "Copyright 2023 Shimin Tang. AnimeJing modifications 2026."
+            vendor = "AnimeJing Project"
+
             licenseFile.set(project.file("LICENSE"))
             windows{
 //                console = true
                 dirChooser = true
-                menuGroup = "幕境"
+                menuGroup = "番境"
+
                 iconFile.set(project.file("src/main/resources/logo/logo.ico"))
             }
             macOS{
@@ -369,8 +371,8 @@ project.afterEvaluate {
         tasks.named("runDistributable") {
             doFirst {
                 println("update VLC plugins cache")
-                val plugins = project.layout.projectDirectory.dir("build/compose/binaries/main/app/幕境/app/resources/VLC/plugins").asFile.absolutePath
-                val cacheGen = project.layout.projectDirectory.dir("build/compose/binaries/main/app/幕境/app/resources/VLC/vlc-cache-gen.exe").asFile.absolutePath
+                val plugins = project.layout.projectDirectory.dir("build/compose/binaries/main/app/番境/app/resources/VLC/plugins").asFile.absolutePath
+                val cacheGen = project.layout.projectDirectory.dir("build/compose/binaries/main/app/番境/app/resources/VLC/vlc-cache-gen.exe").asFile.absolutePath
                 val command = listOf(cacheGen, plugins)
                 try {
                     val process = ProcessBuilder(command).start()
@@ -388,7 +390,7 @@ project.afterEvaluate {
                     include("*.dmg")
                 }.singleFile
                 val arch = System.getProperty("os.arch").lowercase()
-                val newDmgFile = file("${dmgFile.parentFile}/MuJing-${project.version}-${arch}.dmg")
+                val newDmgFile = file("${dmgFile.parentFile}/AnimeJing-${project.version}-${arch}.dmg")
                 if (newDmgFile.exists()) {
                     newDmgFile.delete()
                 }
