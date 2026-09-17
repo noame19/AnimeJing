@@ -60,4 +60,13 @@ bin/
 /rust-zstd-jni/Cargo.lock
 
 ### Whisper 模型文件 ###
+
+### 本地构建/SDK 配置 ###
+local.properties
+
+### AnimeJing 日语资源/构建产物 ###
+/jmdict/
+/dict/jmdict.db
+/audio_jp/
+
 /src/test/resources/whisper/
