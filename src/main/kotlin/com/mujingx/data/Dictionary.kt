@@ -53,20 +53,18 @@ fun mapToWord(result: ResultSet): Word {
     definition = definition.replace("\\n", "\n")
     translation = translation.replace("\\n", "\n")
     return Word(
-        value,
-        usphone,
-        uKphone,
-        definition,
-        translation,
-        pos,
-        collins,
-        oxford,
-        tag,
-        bnc,
-        frq,
-        exchange,
-        mutableListOf(),
-        mutableListOf()
+        value = value,
+        usphone = usphone,
+        ukphone = uKphone,
+        definition = definition,
+        translation = translation,
+        pos = pos,
+        collins = collins,
+        oxford = oxford,
+        tag = tag,
+        bnc = bnc,
+        frq = frq,
+        exchange = exchange,
     )
 }
 object Dictionary{
