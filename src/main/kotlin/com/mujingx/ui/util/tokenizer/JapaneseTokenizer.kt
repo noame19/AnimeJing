@@ -48,7 +48,7 @@ class JapaneseTokenizer : LanguageTokenizer {
             //   reading         — katakana reading; "*" when unknown
             //   position        — char offset of first char of surface
             //   allFeatures     — String[] split by comma
-            val pos: String = m.allFeatures.firstOrNull() ?: ""
+            val pos: String = (m.allFeatures.firstOrNull() as String?) ?: ""
             val base = m.baseForm.takeIf { it != "*" && it.isNotEmpty() } ?: m.surface
             val reading = m.reading.takeIf { it != "*" && it.isNotEmpty() } ?: ""
             Token(
