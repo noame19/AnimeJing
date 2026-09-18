@@ -28,7 +28,7 @@ import opennlp.tools.sentdetect.SentenceDetectorME
 import opennlp.tools.sentdetect.SentenceModel
 import opennlp.tools.tokenize.Tokenizer
 import opennlp.tools.tokenize.TokenizerME
-import opennlp.tools.tokenizer.TokenizerModel
+import opennlp.tools.tokenize.TokenizerModel
 
 /**
  * English tokenizer backed by Apache OpenNLP. Loads the three UD-EWT

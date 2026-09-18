@@ -99,7 +99,7 @@ fun parseJapaneseDocument(
     for (token in tokens) {
         val lemma = token.lemma.ifBlank { token.surface }
         if (lemma.isBlank()) continue
-        if (lemma.length == 1 && lemma[0] in filterChars) continue
+        if (lemma.length == 1 && filterChars.contains(lemma[0].toString())) continue
         if (filterChars.contains(lemma)) continue
 
         val context = clipJapaneseContext(token, text, sentenceLength)
