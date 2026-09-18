@@ -3,7 +3,7 @@ name: Build Package Linux
 # AnimeJing addition (2026-09-17): Linux packaging for Fedora / Ubuntu /
 # any AppImage-capable system. The upstream MuJing workflow matrix only
 # covers Windows + macOS. We add:
-#   - ubuntu-latest  → produces .deb (signed) and .AppImage
+#   - ubuntu-latest  → produces .deb and .AppImage
 #   - ubuntu-latest  → builds an .rpm from the .deb via alien
 #
 # Outputs are uploaded as workflow artifacts named
@@ -54,7 +54,6 @@ jobs:
         run: echo "GRADLE_OPTS=-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8" >> $GITHUB_ENV
 
       - name: Grant execute permission on gradlew
-
         run: chmod +x ./gradlew
 
       - name: Install packaging deps (jpackage DEB/AppImage toolchain)
@@ -66,15 +65,13 @@ jobs:
       - name: Prepare Kuromoji IPADIC dict (bundled in jar, no-op)
         run: echo "Kuromoji IPADIC ships inside kuromoji-ipadic-0.9.0.jar; nothing to download."
 
-
       # --- Build the .deb first (the .AppImage task chains off it) ---
       - name: Build DEB package
         if: matrix.buildDeb
         run: ./gradlew packageDeb
 
-
-      - name: Dump jpackage error log on failure
-        if: failure()
+      - name: Dump jpackage error log on packageDeb failure
+        if: failure() && matrix.buildDeb
         run: |
           LOG=$(ls -1t build/compose/logs/packageDeb/jpackage-*-err.txt 2>/dev/null | head -1 || true)
           if [ -n "$LOG" ]; then
@@ -85,7 +82,21 @@ jobs:
             echo "::warning::no jpackage error log found"
           fi
 
+      - name: Build AppImage
         if: matrix.buildAppImage
+        run: ./gradlew packageAppImage
+
+      - name: Dump jpackage error log on packageAppImage failure
+        if: failure() && matrix.buildAppImage
+        run: |
+          LOG=$(ls -1t build/compose/logs/packageAppImage/jpackage-*-err.txt 2>/dev/null | head -1 || true)
+          if [ -n "$LOG" ]; then
+            echo "::group::jpackage error log ($LOG)"
+            cat "$LOG"
+            echo "::endgroup::"
+          else
+            echo "::warning::no jpackage error log found"
+          fi
 
       - name: Locate DEB
         if: matrix.buildDeb
@@ -109,7 +120,6 @@ jobs:
       - name: Convert DEB → RPM via alien
         if: matrix.buildRpm
         run: |
-          sudo apt-get update -qq
           sudo apt-get install -y alien
           DEB=$(find build/compose/binaries/main/deb -name '*.deb' | head -1)
           if [ -z "$DEB" ]; then echo "::error::No .deb produced"; exit 1; fi
