@@ -72,9 +72,20 @@ jobs:
         if: matrix.buildDeb
         run: ./gradlew packageDeb
 
-      - name: Build AppImage
+
+      - name: Dump jpackage error log on failure
+        if: failure()
+        run: |
+          LOG=$(ls -1t build/compose/logs/packageDeb/jpackage-*-err.txt 2>/dev/null | head -1 || true)
+          if [ -n "$LOG" ]; then
+            echo "::group::jpackage error log ($LOG)"
+            cat "$LOG"
+            echo "::endgroup::"
+          else
+            echo "::warning::no jpackage error log found"
+          fi
+
         if: matrix.buildAppImage
-        run: ./gradlew packageAppImage
 
       - name: Locate DEB
         if: matrix.buildDeb
