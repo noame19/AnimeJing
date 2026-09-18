@@ -164,7 +164,10 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.AppImage)
-            packageName = "番境"
+            // jpackage requires ASCII bundle name; the display name in
+            // the app itself is still 番境 via FileKit appId / menuGroup
+            // where the platform allows.
+            packageName = "AnimeJing"
             packageVersion = version.toString()
             modules("java.compiler","java.instrument","java.management","java.prefs", "java.security.jgss","jdk.security.auth","java.sql", "jdk.unsupported","java.xml.crypto","jdk.accessibility", "java.naming" )
             appResourcesRootDir.set(project.layout.projectDirectory.dir("resources"))
@@ -175,7 +178,7 @@ compose.desktop {
             windows{
 //                console = true
                 dirChooser = true
-                menuGroup = "番境"
+                menuGroup = "AnimeJing"
 
                 iconFile.set(project.file("src/main/resources/logo/logo.ico"))
             }
