@@ -128,7 +128,11 @@ fun HoverableText(
                 text.dropLast(2)
             }
 
-            val dictWord = Dictionary.query(text.lowercase().trim())
+            // AnimeJing: dispatch to the right dictionary. English
+            // vocabulary keeps using the local SQLite ecdict; everything
+            // else (kanji, hiragana, romaji, mixed) falls back to
+            // jisho.org (cached in ~/.cache/animejing/jisho.sqlite).
+            val dictWord = lookupWordForCaption(text, playerState)
 
             Popup(
                 alignment = Alignment.TopCenter,
@@ -735,4 +739,50 @@ fun SubtitleHoverableCaption(
             }
         }
     )
+}
+
+/**
+ * AnimeJing: dispatch to the right dictionary backend based on the
+ * currently loaded vocabulary's language. English queries keep using
+ * the bundled ecdict; Japanese and others fall back to jisho.org via
+ * JishoClient (which keeps a local SQLite cache).
+ */
+private fun lookupWordForCaption(text: String, playerState: PlayerState): Word? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+    val lang = playerState.vocabulary?.language?.lowercase().orEmpty()
+    return when {
+        lang == "japanese" || lang == "ja" -> jishoToWord(trimmed)
+        lang == "english" || lang == "en" || lang.isEmpty() -> Dictionary.query(trimmed.lowercase())
+        else -> jishoToWord(trimmed) ?: Dictionary.query(trimmed.lowercase())
+    }
+}
+
+private fun jishoToWord(text: String): Word? {
+    return try {
+        val client = JishoClient()
+        val hit = client.lookup(text) ?: return null
+        Word(
+            value = hit.kanji,
+            usphone = "",
+            ukphone = "",
+            definition = hit.englishGloss,
+            translation = hit.englishGloss,
+            pos = hit.japanese.firstOrNull()?.let { "" } ?: "",
+            collins = 0,
+            oxford = false,
+            tag = "jisho",
+            bnc = 0,
+            frq = 0,
+            exchange = "",
+            kanji = hit.kanji,
+            kana = hit.kana ?: "",
+            romaji = "",
+            jlpt = hit.jlptLevel,
+            glossEn = hit.englishGloss,
+            glossCn = "",
+        )
+    } catch (e: Exception) {
+        null
+    }
 }
