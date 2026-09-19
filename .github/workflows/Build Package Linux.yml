@@ -108,7 +108,7 @@ jobs:
         run: |
           set -e
           curl -sL \
-            "https://github.com/AppImageCommunity/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            "https://github.com/probonopd/go-appimage/releases/download/continuous/appimagetool-951-x86_64.AppImage" \
             -o /tmp/appimagetool
           chmod +x /tmp/appimagetool
           APPDIR=$PWD/${{ steps.launcher.outputs.appdir }}
