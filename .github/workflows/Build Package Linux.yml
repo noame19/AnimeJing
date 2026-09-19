@@ -70,8 +70,12 @@ jobs:
       # appimagetool / fpm will package). createDistributable picks the
       # correct platform task based on the runner OS; on Linux it
       # produces the .app tree under build/compose/binaries/main/app/.
-      - name: Build staged launcher
-        run: ./gradlew createDistributable
+      # AnimeJing: run the platform-specific package tasks directly.
+      # createDistributable only stages the launcher under
+      # build/compose/binaries/main/app/{packageName}/; it does not
+      # invoke jpackage. packageAppImage does.
+      - name: Build staged launcher + AppImage
+        run: ./gradlew packageAppImage
 
       - name: Dump jpackage error log on failure
         if: failure()
@@ -103,19 +107,25 @@ jobs:
           [ -f "$BIN" ] && chmod +x "$BIN"
           echo "Found staged launcher: $APP_DIR"
 
-      - name: Build AppImage
+      - name: Verify AppImage produced
         if: matrix.buildAppImage
         run: |
           set -e
-          curl -sL \
-            "https://github.com/probonopd/go-appimage/releases/download/continuous/appimagetool-951-x86_64.AppImage" \
-            -o /tmp/appimagetool
-          chmod +x /tmp/appimagetool
-          APPDIR=$PWD/${{ steps.launcher.outputs.appdir }}
-          cd build/compose/binaries/main
-          /tmp/appimagetool "$APPDIR" animejing.AppImage
-          ls -la *.AppImage
-          chmod +x animejing.AppImage
+          # packageAppImage runs above; verify a real .AppImage landed
+          # somewhere under build/compose/binaries/main/.
+          ls -la build/compose/binaries/main/
+          # Compose Desktop's packageAppImage writes the launcher into a
+          # versioned subdir; locate the actual AppImage and rename to
+          # a flat filename for the artifact.
+          IMG=$(find build/compose/binaries/main -type f \( -name '*.AppImage' -o -name '*.app' -o -name 'AnimeJing' \) | head -1)
+          if [ -z "$IMG" ]; then
+            echo "::error::No AppImage under build/compose/binaries/main/"
+            exit 1
+          fi
+          echo "Located AppImage: $IMG"
+          cp -r "$IMG" build/compose/binaries/main/animejing.AppImage 2>/dev/null || cp "$IMG" build/compose/binaries/main/animejing.AppImage
+          chmod +x build/compose/binaries/main/animejing.AppImage
+          ls -la build/compose/binaries/main/animejing.AppImage
 
       - name: Build RPM via fpm
         if: matrix.buildRpm
