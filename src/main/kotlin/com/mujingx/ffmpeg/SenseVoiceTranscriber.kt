@@ -29,7 +29,7 @@ import java.io.File
 /**
  * AnimeJing's optional ASR for media files that have no embedded
  * subtitles. Wraps the SenseVoiceSmall ONNX model via a Python helper
- * (sherpa-onnx), parallel in shape to [KokoroTTS].
+ * (sherpa-onnx), parallel in shape to [com.mujingx.tts.KokoroTTS].
  *
  * Models live under ~/.cache/animejing/sensevoice and must be fetched
  * beforehand via:
@@ -48,15 +48,29 @@ object SenseVoiceTranscriber {
         outputSrt: File,
         language: String = "ja",
         helperScript: File = defaultHelper(),
-    ): Boolean = try {
-        if (!helperScript.exists()) {
-            log.warn("sensevoice helper script missing at {}", helperScript.absolutePath)
-            return false
+    ): Boolean {
+        return try {
+            if (!helperScript.exists()) {
+                log.warn("sensevoice helper script missing at {}", helperScript.absolutePath)
+                false
+            } else if (!inputMedia.exists()) {
+                log.warn("input media not found: {}", inputMedia.absolutePath)
+                false
+            } else {
+                doTranscribe(inputMedia, outputSrt, language, helperScript)
+            }
+        } catch (e: Exception) {
+            log.warn("sensevoice transcribe failed: {}", e.message)
+            false
         }
-        if (!inputMedia.exists()) {
-            log.warn("input media not found: {}", inputMedia.absolutePath)
-            return false
-        }
+    }
+
+    private fun doTranscribe(
+        inputMedia: File,
+        outputSrt: File,
+        language: String,
+        helperScript: File,
+    ): Boolean {
         val pb = ProcessBuilder(
             "python3",
             helperScript.absolutePath,
@@ -76,10 +90,7 @@ object SenseVoiceTranscriber {
             return false
         }
         log.info("wrote SRT to {}", outputSrt.absolutePath)
-        true
-    } catch (e: Exception) {
-        log.warn("sensevoice transcribe failed: {}", e.message)
-        false
+        return true
     }
 
     fun defaultHelper(): File {
