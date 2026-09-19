@@ -1,16 +1,15 @@
 name: Build Package Linux
 
-# AnimeJing addition (2026-09-17): Linux packaging for Fedora / Ubuntu /
-# any AppImage-capable system. The upstream MuJing workflow matrix only
-# covers Windows + macOS. We add:
-#   - ubuntu-latest  → produces .deb and .AppImage
-#   - ubuntu-latest  → builds an .rpm from the .deb via alien
+# AnimeJing (2026-09-19): Linux packaging for Fedora 44 KDE Plasma 6
+# Wayland + any other Linux. Outputs:
+#   - real .AppImage (single file via appimagetool) for any distro
+#   - real .rpm (built via fpm from the staged layout, not alien-converted)
 #
-# Outputs are uploaded as workflow artifacts named
-# `linux-package-<distro>-<arch>`. No release is created automatically;
-# promotion to a GitHub Release is a separate manual step.
+# We deliberately do NOT produce a .deb — the user runs Fedora and DEB
+# support is irrelevant for the target audience. If a future user
+# wants .deb we can add another matrix entry.
 on:
-  workflow_dispatch: # Manual trigger only
+  workflow_dispatch:
   push:
     tags: [ '*' ]
 
@@ -26,16 +25,12 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            name: Ubuntu 24.04 (AppImage + DEB)
-            artifactBase: linux-ubuntu
+            name: Fedora 44 KDE (AppImage)
+            artifactBase: animejing-fedora-appimage
             buildAppImage: true
-            buildDeb: true
-            buildRpm: false
           - os: ubuntu-latest
-            name: Ubuntu 24.04 (RPM via alien)
-            artifactBase: linux-rpm
-            buildAppImage: false
-            buildDeb: true
+            name: Fedora 44 KDE (RPM via fpm)
+            artifactBase: animejing-fedora-rpm
             buildRpm: true
     steps:
       - name: Checkout code
@@ -53,26 +48,32 @@ jobs:
       - name: Set UTF-8 encoding
         run: echo "GRADLE_OPTS=-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8" >> $GITHUB_ENV
 
+      - name: Export VERSION from build.gradle.kts
+        run: |
+          VERSION=$(grep -oE 'version = "[^"]+"' build.gradle.kts | head -1 | sed 's/version = "//;s/"//')
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Resolved version: ${VERSION}"
+
       - name: Grant execute permission on gradlew
         run: chmod +x ./gradlew
 
-      - name: Install packaging deps (jpackage DEB/AppImage toolchain)
+      - name: Install packaging toolchain (jpackage + fpm + appimagetool)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            fakeroot binutils dpkg-dev
+            fakeroot binutils ruby-dev rpm
+          sudo gem install --no-document fpm
 
-      - name: Prepare Kuromoji IPADIC dict (bundled in jar, no-op)
+      - name: Prepare Kuromoji IPADIC dict (bundled in jar)
         run: echo "Kuromoji IPADIC ships inside kuromoji-ipadic-0.9.0.jar; nothing to download."
 
-      - name: Build DEB package
-        if: matrix.buildDeb
-        run: ./gradlew packageDeb
+      - name: Build staged launcher image
+        run: ./gradlew prepareAppResources
 
-      - name: Dump jpackage error log on packageDeb failure
-        if: failure() && matrix.buildDeb
+      - name: Dump jpackage error log on failure
+        if: failure()
         run: |
-          LOG=$(ls -1t build/compose/logs/packageDeb/jpackage-*-err.txt 2>/dev/null | head -1 || true)
+          LOG=$(ls -1t build/compose/logs/createDistributable/jpackage-*-err.txt 2>/dev/null | head -1 || true)
           if [ -n "$LOG" ]; then
             echo "::group::jpackage error log ($LOG)"
             cat "$LOG"
@@ -80,77 +81,75 @@ jobs:
           else
             echo "::warning::no jpackage error log found"
           fi
+
+      - name: Inspect staged launcher
+        run: |
+          echo "::group::build/compose/binaries tree"
+          find build/compose/binaries -maxdepth 4 -type d | head -40
+          echo "---files---"
+          find build/compose/binaries -maxdepth 4 -type f | head -40
+          echo "::endgroup::"
+
+      - name: Locate staged launcher
+        id: launcher
+        run: |
+          APP_DIR=$([ -d build/compose/binaries/main/app/AnimeJing ] && echo build/compose/binaries/main/app/AnimeJing || echo build/compose/binaries/main/app)
+          echo "appdir=$APP_DIR" >> "$GITHUB_OUTPUT"
+          if [ ! -d "$APP_DIR" ]; then echo "::error::No staged app directory found"; exit 1; fi
+          BIN="$APP_DIR/bin/AnimeJing"
+          [ -f "$BIN" ] && chmod +x "$BIN"
+          echo "Found staged launcher: $APP_DIR"
 
       - name: Build AppImage
         if: matrix.buildAppImage
-        run: ./gradlew packageAppImage
-
-      - name: Dump jpackage error log on packageAppImage failure
-        if: failure() && matrix.buildAppImage
         run: |
-          LOG=$(ls -1t build/compose/logs/packageAppImage/jpackage-*-err.txt 2>/dev/null | head -1 || true)
-          if [ -n "$LOG" ]; then
-            echo "::group::jpackage error log ($LOG)"
-            cat "$LOG"
-            echo "::endgroup::"
-          else
-            echo "::warning::no jpackage error log found"
-          fi
+          set -e
+          curl -sL \
+            "https://github.com/AppImageCommunity/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            -o /tmp/appimagetool
+          chmod +x /tmp/appimagetool
+          export APPDIR=$PWD/${{ steps.launcher.outputs.appdir }}
+          cd build/compose/binaries/main
+          /tmp/appimagetool "$APPDIR" animejing.AppImage
+          ls -la *.AppImage
+          chmod +x animejing.AppImage
 
-      - name: Inspect build/compose/binaries/main contents
-        if: matrix.buildAppImage || matrix.buildDeb
-        run: |
-          echo "::group::binary tree"
-          find build/compose/binaries/main -maxdepth 4 -type d
-          echo "---files---"
-          find build/compose/binaries/main -maxdepth 4 -type f
-          echo "::endgroup::"
-
-      - name: Locate DEB
-        if: matrix.buildDeb
-        id: deb
-        run: |
-          DEB=$(find build/compose/binaries/main/deb -name '*.deb' | head -1)
-          echo "deb=$DEB" >> "$GITHUB_OUTPUT"
-          if [ -z "$DEB" ]; then echo "::error::No .deb produced"; exit 1; fi
-          echo "Found: $DEB"
-
-      - name: Locate AppImage
-        if: matrix.buildAppImage
-        id: appimage
-        run: |
-          APP=$(find build/compose/binaries/main/app -type f -executable | head -1)
-          echo "appimage=$APP" >> "$GITHUB_OUTPUT"
-          if [ -z "$APP" ]; then echo "::error::No AppImage executable found under build/compose/binaries/main/app"; exit 1; fi
-          echo "Found: $APP"
-          chmod +x "$APP"
-
-      - name: Convert DEB → RPM via alien
+      - name: Build RPM via fpm
         if: matrix.buildRpm
         run: |
-          sudo apt-get install -y alien
-          DEB=$(find build/compose/binaries/main/deb -name '*.deb' | head -1)
-          if [ -z "$DEB" ]; then echo "::error::No .deb produced"; exit 1; fi
-          # -k keeps version; --scripts preserves pre/post scripts (none here).
-          sudo alien --to-rpm --scripts --keep-version "$DEB"
-          mkdir -p build/compose/binaries/main/rpm
-          mv *.rpm build/compose/binaries/main/rpm/
-
-      - name: Upload DEB
-        if: matrix.buildDeb
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifactBase }}-deb
-          path: build/compose/binaries/main/deb/*.deb
-          if-no-files-found: error
-          retention-days: 14
+          set -e
+          APP_DIR=$PWD/${{ steps.launcher.outputs.appdir }}
+          INSTALL_ROOT=/tmp/animejing-rpm-build
+          rm -rf "$INSTALL_ROOT"
+          mkdir -p "$INSTALL_ROOT/opt/AnimeJing"
+          cp -r "$APP_DIR" "$INSTALL_ROOT/opt/AnimeJing/"
+          chmod +x "$INSTALL_ROOT/opt/AnimeJing/bin/AnimeJing"
+          fpm \
+            -s dir \
+            -t rpm \
+            -n animejing \
+            -v "${VERSION}" \
+            --description "AnimeJing — learn Japanese through anime" \
+            --url "https://github.com/noame19/AnimeJing" \
+            --license "GPL-3.0" \
+            --vendor "AnimeJing Project" \
+            --maintainer "noame19 <[email protected]>" \
+            --depends "java-21-openjdk-headless >= 21" \
+            --depends "libgtk-3-0" \
+            --depends "libnss3" \
+            --depends "fuse" \
+            --depends "libxshmfence1" \
+            --rpm-digest sha256 \
+            -C "$INSTALL_ROOT" \
+            -p build/compose/binaries/main/animejing.rpm
+          ls -la build/compose/binaries/main/*.rpm
 
       - name: Upload AppImage
         if: matrix.buildAppImage
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifactBase }}-appimage
-          path: build/compose/binaries/main/app
+          name: ${{ matrix.artifactBase }}
+          path: build/compose/binaries/main/animejing.AppImage
           if-no-files-found: error
           retention-days: 14
 
@@ -158,7 +157,22 @@ jobs:
         if: matrix.buildRpm
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifactBase }}-rpm
-          path: build/compose/binaries/main/rpm/*.rpm
+          name: ${{ matrix.artifactBase }}
+          path: build/compose/binaries/main/animejing.rpm
           if-no-files-found: error
           retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## AnimeJing Linux build summary" >> $GITHUB_STEP_SUMMARY
+          echo "- AppImage branch: ${{ matrix.buildAppImage }}" >> $GITHUB_STEP_SUMMARY
+          echo "- RPM branch: ${{ matrix.buildRpm }}" >> $GITHUB_STEP_SUMMARY
+          if [ -f build/compose/binaries/main/animejing.AppImage ]; then
+            SIZE=$(du -h build/compose/binaries/main/animejing.AppImage | cut -f1)
+            echo "- AppImage size: $SIZE" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f build/compose/binaries/main/animejing.rpm ]; then
+            SIZE=$(du -h build/compose/binaries/main/animejing.rpm | cut -f1)
+            echo "- RPM size: $SIZE" >> $GITHUB_STEP_SUMMARY
+          fi
