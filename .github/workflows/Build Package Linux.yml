@@ -6,8 +6,7 @@ name: Build Package Linux
 #   - real .rpm (built via fpm from the staged layout, not alien-converted)
 #
 # We deliberately do NOT produce a .deb — the user runs Fedora and DEB
-# support is irrelevant for the target audience. If a future user
-# wants .deb we can add another matrix entry.
+# support is irrelevant for the target audience.
 on:
   workflow_dispatch:
   push:
@@ -67,8 +66,12 @@ jobs:
       - name: Prepare Kuromoji IPADIC dict (bundled in jar)
         run: echo "Kuromoji IPADIC ships inside kuromoji-ipadic-0.9.0.jar; nothing to download."
 
-      - name: Build staged launcher image
-        run: ./gradlew prepareAppResources
+      # Build the staged application image (the .app directory that
+      # appimagetool / fpm will package). createDistributable picks the
+      # correct platform task based on the runner OS; on Linux it
+      # produces the .app tree under build/compose/binaries/main/app/.
+      - name: Build staged launcher
+        run: ./gradlew createDistributable
 
       - name: Dump jpackage error log on failure
         if: failure()
@@ -95,7 +98,7 @@ jobs:
         run: |
           APP_DIR=$([ -d build/compose/binaries/main/app/AnimeJing ] && echo build/compose/binaries/main/app/AnimeJing || echo build/compose/binaries/main/app)
           echo "appdir=$APP_DIR" >> "$GITHUB_OUTPUT"
-          if [ ! -d "$APP_DIR" ]; then echo "::error::No staged app directory found"; exit 1; fi
+          if [ ! -d "$APP_DIR" ]; then echo "::error::No staged app directory found under build/compose/binaries/main/app"; exit 1; fi
           BIN="$APP_DIR/bin/AnimeJing"
           [ -f "$BIN" ] && chmod +x "$BIN"
           echo "Found staged launcher: $APP_DIR"
@@ -108,7 +111,7 @@ jobs:
             "https://github.com/AppImageCommunity/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
             -o /tmp/appimagetool
           chmod +x /tmp/appimagetool
-          export APPDIR=$PWD/${{ steps.launcher.outputs.appdir }}
+          APPDIR=$PWD/${{ steps.launcher.outputs.appdir }}
           cd build/compose/binaries/main
           /tmp/appimagetool "$APPDIR" animejing.AppImage
           ls -la *.AppImage
