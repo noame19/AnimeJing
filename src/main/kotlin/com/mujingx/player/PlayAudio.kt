@@ -28,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.withLock
 import com.mujingx.state.getAudioDirectory
 import com.mujingx.tts.AzureTTS
+import com.mujingx.tts.KokoroTTS
 import com.mujingx.tts.MSTTSpeech
 import com.mujingx.tts.MacTTS
 import com.mujingx.tts.UbuntuTTS
@@ -62,7 +63,10 @@ fun playAudio(
         if (pronunciation == "local TTS" || audioPath.isEmpty()) {
                 audioPlaybackMutex.withLock {
                     changePlayerState(true)
-                    try{
+                    // AnimeJing: Kokoro-82M ONNX first; falls back to OS TTS.
+                    val kokoro = KokoroTTS()
+                    val handled = kokoro.speakAndWait(word)
+                    if (!handled) try {
                         if (isWindows()) {
                             val speech = MSTTSpeech()
                             speech.speak(word)
@@ -71,7 +75,7 @@ fun playAudio(
                         } else {
                             UbuntuTTS().speakAndWait(word)
                         }
-                    }catch (e:Exception){
+                    } catch (e: Exception) {
                         e.printStackTrace()
                     }finally {
                         changePlayerState(false)
