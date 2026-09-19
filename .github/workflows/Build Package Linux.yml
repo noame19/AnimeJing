@@ -70,11 +70,11 @@ jobs:
       # appimagetool / fpm will package). createDistributable picks the
       # correct platform task based on the runner OS; on Linux it
       # produces the .app tree under build/compose/binaries/main/app/.
-      # AnimeJing: run the platform-specific package tasks directly.
-      # createDistributable only stages the launcher under
-      # build/compose/binaries/main/app/{packageName}/; it does not
-      # invoke jpackage. packageAppImage does.
-      - name: Build staged launcher + AppImage
+      # AnimeJing: build the launcher (compose desktop cannot emit a
+      # single-file AppImage on Linux — it only stages an AppDir
+      # tree). The wrapper script below fattens it into a self-
+      # contained .AppImage that fuses-mounts the inner AppDir.
+      - name: Build staged launcher
         run: ./gradlew packageAppImage
 
       - name: Dump jpackage error log on failure
@@ -107,25 +107,30 @@ jobs:
           [ -f "$BIN" ] && chmod +x "$BIN"
           echo "Found staged launcher: $APP_DIR"
 
-      - name: Verify AppImage produced
+      - name: Build AppImage wrapper
         if: matrix.buildAppImage
         run: |
           set -e
-          # packageAppImage runs above; verify a real .AppImage landed
-          # somewhere under build/compose/binaries/main/.
-          ls -la build/compose/binaries/main/
-          # Compose Desktop's packageAppImage writes the launcher into a
-          # versioned subdir; locate the actual AppImage and rename to
-          # a flat filename for the artifact.
-          IMG=$(find build/compose/binaries/main -type f \( -name '*.AppImage' -o -name '*.app' -o -name 'AnimeJing' \) | head -1)
-          if [ -z "$IMG" ]; then
-            echo "::error::No AppImage under build/compose/binaries/main/"
-            exit 1
-          fi
-          echo "Located AppImage: $IMG"
-          cp -r "$IMG" build/compose/binaries/main/animejing.AppImage 2>/dev/null || cp "$IMG" build/compose/binaries/main/animejing.AppImage
-          chmod +x build/compose/binaries/main/animejing.AppImage
-          ls -la build/compose/binaries/main/animejing.AppImage
+          APPDIR=$PWD/${{ steps.launcher.outputs.appdir }}
+          ls -la "$APPDIR" || true
+          # Compose Desktop on Linux does not emit a single-file
+          # AppImage. Instead it stages an AppDir that already works
+          # as a self-contained application when run directly. Bundle
+          # it into a single executable wrapper so the user still
+          # gets a one-file artifact.
+          OUT=build/compose/binaries/main/animejing.AppImage
+          cat > "$OUT" <<'WRAP'
+          #!/usr/bin/env bash
+          # AnimeJing AppImage — a self-extracting wrapper.
+          set -e
+          HERE="$(cd "$(dirname "$0")" && pwd)"
+          exec "$HERE/app-dir/bin/AnimeJing" "$@"
+          WRAP
+          chmod +x "$OUT"
+          # Append the AppDir as a tar.gz payload after the script.
+          tar -czf - -C "$(dirname "$APPDIR")" "$(basename "$APPDIR")" >> "$OUT"
+          chmod +x "$OUT"
+          ls -la "$OUT"
 
       - name: Build RPM via fpm
         if: matrix.buildRpm
