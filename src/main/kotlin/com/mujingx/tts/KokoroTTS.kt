@@ -48,7 +48,21 @@ class KokoroTTS(
     private val log = LoggerFactory.getLogger("KokoroTTS")
 
     /** Speak [text] synchronously; returns true if kokoro handled it. */
-    fun speakAndWait(text: String): Boolean = try {
+    fun speakAndWait(text: String): Boolean {
+        return try {
+            if (!helperScript.exists()) {
+                log.warn("kokoro helper script not found at {}", helperScript.absolutePath)
+                false
+            } else {
+                doSpeak(text)
+            }
+        } catch (e: Exception) {
+            log.warn("kokoro speak failed: {}", e.message)
+            false
+        }
+    }
+
+    private fun doSpeak(text: String): Boolean {
         if (!helperScript.exists()) {
             log.warn("kokoro helper script not found at {}", helperScript.absolutePath)
             return false
@@ -79,10 +93,7 @@ class KokoroTTS(
         // Play the wav via Java Sound.
         playWav(wav)
         wav.delete()
-        true
-    } catch (e: Exception) {
-        log.warn("kokoro speak failed: {}", e.message)
-        false
+        return true
     }
 
     /** Pure-Java WAV playback. Falls back if no audio device. */
