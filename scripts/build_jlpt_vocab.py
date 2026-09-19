@@ -103,21 +103,27 @@ JLPT_SEEDS = {
 }
 
 
-def lookup_jisho(keyword: str) -> dict | None:
+def lookup_jisho(keyword: str, retries: int = 3) -> dict | None:
     """Call jisho.org public API for one keyword. Returns the data[0]
-    entry's subset or None on any failure."""
-    try:
-        url = "https://jisho.org/api/v1/search/words?keyword=" + urllib.parse.quote(keyword)
-        req = urllib.request.Request(url, headers={"User-Agent": "AnimeJing/0.1"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
-        print(f"  [warn] jisho lookup '{keyword}' failed: {e}", file=sys.stderr)
-        return None
-    data = payload.get("data") or []
-    if not data:
-        return None
-    return data[0]
+    entry's subset or None on any failure. Retries on transient SSL /
+    timeout errors with exponential backoff."""
+    import time as _time
+    last_err = None
+    for attempt in range(retries):
+        try:
+            url = "https://jisho.org/api/v1/search/words?keyword=" + urllib.parse.quote(keyword)
+            req = urllib.request.Request(url, headers={"User-Agent": "AnimeJing/0.1"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            data = payload.get("data") or []
+            if not data:
+                return None
+            return data[0]
+        except Exception as e:
+            last_err = e
+            _time.sleep(0.6 * (attempt + 1))
+    print(f"  [warn] jisho lookup '{keyword}' failed after {retries} tries: {last_err}", file=sys.stderr)
+    return None
 
 
 def entry_to_word(level: str, jisho: dict) -> dict:
