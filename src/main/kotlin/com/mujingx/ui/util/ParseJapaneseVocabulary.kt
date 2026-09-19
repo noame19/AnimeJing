@@ -24,6 +24,7 @@
 
 package com.mujingx.ui.util
 
+import com.mujingx.data.JishoClient
 import com.mujingx.data.Word
 import com.mujingx.ui.util.tokenizer.LanguageTokenizer
 import com.mujingx.ui.util.tokenizer.Tokenizers
@@ -111,16 +112,37 @@ fun parseJapaneseDocument(
 
     // Until C1 lands we synthesise a Word from the Kuromoji morpheme so
     // downstream UI / FSRS can still render something.
+    // AnimeJing: enrich every lemma via JishoClient so each Word row
+    // carries kana / kanji / glossEn / jlpt fields populated. Network or
+    // cache failures fall back to a context-only Word so vocabulary
+    // generation never silently drops a word.
+    val jisho = JishoClient()
     return contextByLemma.entries.map { (lemma, ctxs) ->
         val joinedCtx = ctxs.joinToString("\n").trim()
-        Word(
-            value = lemma,
-            kanji = lemma,
-            kana = "",
-            romaji = "",
-            glossCn = joinedCtx,
-            pos = "",
-        )
+        val hit = jisho.lookup(lemma)
+        if (hit != null) {
+            Word(
+                value = hit.kanji.ifBlank { lemma },
+                kanji = hit.kanji,
+                kana = hit.kana ?: "",
+                romaji = "",
+                glossCn = joinedCtx,
+                glossEn = hit.englishGloss,
+                jlpt = hit.jlptLevel,
+                pos = "",
+                tag = "anime-subtitle",
+            )
+        } else {
+            Word(
+                value = lemma,
+                kanji = lemma,
+                kana = "",
+                romaji = "",
+                glossCn = joinedCtx,
+                pos = "",
+                tag = "anime-subtitle",
+            )
+        }
     }
 }
 
